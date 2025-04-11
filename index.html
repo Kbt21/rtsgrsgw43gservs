@@ -33,8 +33,10 @@
         }
         #reader {
             width: 300px;
+            height: 200px; /* ADDED HEIGHT */
             margin: auto;
-            display: none;
+            display: block; /* CHANGED FROM NONE */
+            border: 1px solid red; /* FOR TESTING */
         }
     </style>
 </head>
@@ -57,6 +59,9 @@
 
     <!-- Camera Scanner -->
     <div id="reader"></div>
+
+    <!-- BASIC CAMERA TEST -->
+    <video id="videoTest" width="300" height="200" autoplay style="border: 1px solid blue;"></video>
 
     <script>
         let qrInstance = null; // Instance of the QR code generator
@@ -94,25 +99,49 @@
 
         async function startScanner(inputFieldId) {
             try {
+
+                // 1. Request camera access
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
 
-                $("#reader").show();
+                // 2. Basic Camera Test
+                document.getElementById('videoTest').srcObject = stream;
+
+                // 3. Ensure #reader is visible and has a size
+                $("#reader").css({ display: "block", width: "300px", height: "200px" });
+                console.log("Reader dimensions:", document.getElementById("reader").getBoundingClientRect());
+
+                // 4. Initialize Html5Qrcode AFTER permission
                 const html5QrCode = new Html5Qrcode("reader");
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: 250 },
-                    decodedText => {
-                        $(`#${inputFieldId}`).val(decodedText);
-                        generateQR();
-                        html5QrCode.stop().then(() => $("#reader").hide());
-                    },
-                    errorMessage => {
-                        console.log("QR Code scan error:", errorMessage);
+
+                // 5. List cameras and start
+                Html5Qrcode.getCameras().then(devices => {
+                    console.log("Available cameras:", devices);
+                    if (devices && devices.length) {
+                        const cameraId = devices[0].id;
+                        return html5QrCode.start(
+                            cameraId,
+                            { fps: 10, qrbox: 250 },
+                            decodedText => {
+                                console.log("Decoded text:", decodedText);
+                                $(`#${inputFieldId}`).val(decodedText);
+                                generateQR();
+                                html5QrCode.stop().then(() => $("#reader").hide());
+                            },
+                            errorMessage => {
+                                console.warn("QR Code scan error:", errorMessage);
+                            }
+                        );
+                    } else {
+                        throw new Error("No cameras found.");
                     }
-                );
+                }).catch(err => {
+                    console.error("Html5Qrcode.start failed:", err);
+                    alert("Failed to start QR code scanner: " + err.message);
+                });
+
             } catch (error) {
-                console.error("Camera access denied:", error);
-                alert("Unable to access the camera. Please check permissions.");
+                console.error("Camera access denied or initialization failed:", error);
+                alert("Unable to access the camera. Please check permissions. " + error.message);
             }
         }
 
@@ -153,6 +182,12 @@
             // Attach click events to input fields for scanning
             $('#qrInput1').on('click', () => startScanner('qrInput1'));
             $('#qrInput2').on('click', () => startScanner('qrInput2'));
+
+            // Initialize basic camera test
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => document.getElementById('videoTest').srcObject = stream)
+                .catch(err => console.error("Basic camera test failed:", err));
+
         });
 
         // Cleanup timer when leaving the page

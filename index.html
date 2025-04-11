@@ -94,11 +94,11 @@
 
         // Function to start the camera scanner for a specific input field
         function startScanner(inputFieldId) {
-            const html5QrCode = new Html5Qrcode("reader");
-
+            // Request camera access explicitly
             navigator.mediaDevices.getUserMedia({ video: true })
-                .then(() => {
+                .then(stream => {
                     $("#reader").show();
+                    const html5QrCode = new Html5Qrcode("reader");
                     html5QrCode.start(
                         { facingMode: "environment" }, // Use back camera
                         { fps: 10, qrbox: 250 },
@@ -166,3 +166,4 @@
     </script>
 </body>
 </html>
+

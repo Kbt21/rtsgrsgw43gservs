@@ -92,34 +92,28 @@
             }
         }
 
-        // Function to start the camera scanner for a specific input field
-        function startScanner(inputFieldId) {
-            // Request camera access explicitly
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => {
-                    $("#reader").show();
-                    const html5QrCode = new Html5Qrcode("reader");
-                    html5QrCode.start(
-                        { facingMode: "environment" }, // Use back camera
-                        { fps: 10, qrbox: 250 },
-                        decodedText => {
-                            $(`#${inputFieldId}`).val(decodedText); // Populate input field with scanned text
-                            generateQR(); // Update the QR code dynamically
-                            html5QrCode.stop().then(() => $("#reader").hide()); // Stop scanner after success
-                        },
-                        errorMessage => {
-                            console.log("QR Code scan error:", errorMessage);
-                        }
-                    ).catch(err => {
-                        console.error("Camera initialization failed:", err);
-                        alert("Unable to access camera. Please check permissions.");
-                        $("#reader").hide();
-                    });
-                })
-                .catch(error => {
-                    console.error("Camera access denied:", error);
-                    alert("Unable to access the camera. Please check permissions.");
-                });
+        async function startScanner(inputFieldId) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+                $("#reader").show();
+                const html5QrCode = new Html5Qrcode("reader");
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: 250 },
+                    decodedText => {
+                        $(`#${inputFieldId}`).val(decodedText);
+                        generateQR();
+                        html5QrCode.stop().then(() => $("#reader").hide());
+                    },
+                    errorMessage => {
+                        console.log("QR Code scan error:", errorMessage);
+                    }
+                );
+            } catch (error) {
+                console.error("Camera access denied:", error);
+                alert("Unable to access the camera. Please check permissions.");
+            }
         }
 
         // Function to print the generated QR code
@@ -166,4 +160,3 @@
     </script>
 </body>
 </html>
-

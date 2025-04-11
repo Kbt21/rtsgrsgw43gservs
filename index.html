@@ -99,27 +99,53 @@
 
         async function startScanner(inputFieldId) {
             try {
+                // 1. Define constraints for rear camera
+                const constraints = {
+                    video: { facingMode: "environment" }
+                };
 
-                // 1. Request camera access
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // 2. Request camera access with rear camera
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-                // 2. Basic Camera Test
+                // 3. Basic Camera Test
                 document.getElementById('videoTest').srcObject = stream;
 
-                // 3. Ensure #reader is visible and has a size
+                // 4. Ensure #reader is visible and has a size
                 $("#reader").css({ display: "block", width: "300px", height: "200px" });
                 console.log("Reader dimensions:", document.getElementById("reader").getBoundingClientRect());
 
-                // 4. Initialize Html5Qrcode AFTER permission
+                // 5. Initialize Html5Qrcode AFTER permission
                 const html5QrCode = new Html5Qrcode("reader");
 
-                // 5. List cameras and start
-                Html5Qrcode.getCameras().then(devices => {
-                    console.log("Available cameras:", devices);
-                    if (devices && devices.length) {
-                        const cameraId = devices[0].id;
-                        return html5QrCode.start(
-                            cameraId,
+                // 6. Start Html5Qrcode with stream constraints
+                html5QrCode.start(
+                    constraints,
+                    { fps: 10, qrbox: 250 },
+                    decodedText => {
+                        console.log("Decoded text:", decodedText);
+                        $(`#${inputFieldId}`).val(decodedText);
+                        generateQR();
+                        html5QrCode.stop().then(() => $("#reader").hide());
+                    },
+                    errorMessage => {
+                        console.warn("QR Code scan error:", errorMessage);
+                    }
+                ).catch(err => {
+                    console.error("Html5Qrcode.start failed:", err);
+                    alert("Failed to start QR code scanner: " + err.message);
+                });
+
+            } catch (error) {
+                console.error("Camera access denied or initialization failed:", error);
+                alert("Unable to access the camera or rear camera not available. Please check permissions. " + error.message);
+                // Fallback to any available camera
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        document.getElementById('videoTest').srcObject = stream;
+                        $("#reader").show();
+                        const html5QrCode = new Html5Qrcode("reader");
+                        html5QrCode.start(
+                            { facingMode: "user" },
                             { fps: 10, qrbox: 250 },
                             decodedText => {
                                 console.log("Decoded text:", decodedText);
@@ -130,18 +156,15 @@
                             errorMessage => {
                                 console.warn("QR Code scan error:", errorMessage);
                             }
-                        );
-                    } else {
-                        throw new Error("No cameras found.");
-                    }
-                }).catch(err => {
-                    console.error("Html5Qrcode.start failed:", err);
-                    alert("Failed to start QR code scanner: " + err.message);
-                });
-
-            } catch (error) {
-                console.error("Camera access denied or initialization failed:", error);
-                alert("Unable to access the camera. Please check permissions. " + error.message);
+                        ).catch(err => {
+                            console.error("Html5Qrcode.start failed (fallback):", err);
+                            alert("Failed to start QR code scanner (fallback): " + err.message);
+                        });
+                    })
+                    .catch(err => {
+                        console.error("Camera access denied (fallback):", err);
+                        alert("Unable to access any camera. Please check permissions. " + err.message);
+                    });
             }
         }
 

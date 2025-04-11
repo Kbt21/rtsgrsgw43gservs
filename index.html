@@ -3,215 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Code Scanner and Generator</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            text-align: center;
-        }
-        input {
-            margin: 10px;
-            padding: 8px;
-            width: 300px;
-        }
-        #qrcode {
-            margin: 20px auto;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        #reader {
-            width: 300px;
-            height: 200px; /* ADDED HEIGHT */
-            margin: auto;
-            display: block; /* CHANGED FROM NONE */
-            border: 1px solid red; /* FOR TESTING */
-        }
-    </style>
+    <title>QR Code Scanner</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-    <h1>QR Code Scanner and Generator</h1>
+    <h1>QR Code Scanner</h1>
+    <div id="reader" style="width: 300px; height: 300px; border: 1px solid black;"></div>
+    <input type="text" id="inputField" placeholder="Scanned QR Code Text">
+    <button onclick="startScanner('inputField')">Start Scanner</button>
 
-    <!-- Input fields for scanning -->
-    <input id="qrInput1" type="text" placeholder="Click to scan QR Code (Field 1)" readonly>
-    <input id="qrInput2" type="text" placeholder="Click to scan QR Code (Field 2)" readonly>
-
-    <!-- QR Code Display -->
-    <div id="qrcode"></div>
-
-    <!-- Date and Time -->
-    <div id="current_date"></div>
-    <span id="clock"></span>
-
-    <!-- Print Button -->
-    <button onclick="printQRCode()">Print QR Code</button>
-
-    <!-- Camera Scanner -->
-    <div id="reader"></div>
-
-    <!-- BASIC CAMERA TEST -->
-    <video id="videoTest" width="300" height="200" autoplay style="border: 1px solid blue;"></video>
-
-    <script>
-        let qrInstance = null;
-        let updateTimer = null;
-
-        function generateQR() {
-            const value1 = $('#qrInput1').val() || '';
-            const value2 = $('#qrInput2').val() || '';
-            const now = new Date();
-
-            const dateStr = now.toLocaleDateString('en-US');
-            const timeStr = now.toLocaleTimeString('en-US');
-            $('#current_date').text(`Date: ${dateStr}`);
-            $('#clock').text(`Time: ${timeStr}`);
-
-            const qrData = `${value1}|${value2}|${dateStr}|${timeStr}`;
-
-            if (qrInstance) {
-                qrInstance.makeCode(qrData);
-            } else {
-                qrInstance = new QRCode(document.getElementById('qrcode'), {
-                    text: qrData,
-                    width: 256,
-                    height: 256,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-            }
-        }
-
-        async function startScanner(inputFieldId) {
-            try {
-                let stream = null;
-                let selectedDeviceId = null;
-                let hasRearCamera = false;
-
-                // 1. Get available cameras
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-                console.log("Available video devices:", videoDevices);
-
-                // 2. Attempt to find rear camera and default to first camera
-                for (const device of videoDevices) {
-                    if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('rear')) {
-                        selectedDeviceId = device.deviceId;
-                        hasRearCamera = true;
-                        break;
-                    }
-                }
-
-                if (!selectedDeviceId && videoDevices.length > 0) {
-                    selectedDeviceId = videoDevices[0].deviceId;
-                    console.log("Defaulting to first available camera:", videoDevices[0]);
-                }
-
-                if (!selectedDeviceId) {
-                    throw new Error("No camera found.");
-                }
-
-                // 3. Define constraints
-                const constraints = {
-                    video: {
-                        deviceId: { exact: selectedDeviceId },
-                        facingMode: hasRearCamera ? "environment" : "user"
-                    }
-                };
-
-                console.log("Using constraints:", constraints);
-
-                // 4. Request camera access with constraints
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-                // 5. Basic Camera Test
-                document.getElementById('videoTest').srcObject = stream;
-
-                // 6. Ensure #reader is visible and has a size
-                $("#reader").css({ display: "block", width: "300px", height: "200px" });
-                console.log("Reader dimensions:", document.getElementById("reader").getBoundingClientRect());
-
-                // 7. Initialize Html5Qrcode AFTER permission
-                const html5QrCode = new Html5Qrcode("reader");
-
-                // 8. Start Html5Qrcode with constraints
-                html5QrCode.start(
-                    constraints,
-                    { fps: 10, qrbox: 250 },
-                    decodedText => {
-                        console.log("Decoded text:", decodedText);
-                        $(`#${inputFieldId}`).val(decodedText);
-                        generateQR();
-                        html5QrCode.stop().then(() => $("#reader").hide());
-                    },
-                    errorMessage => {
-                        console.warn("QR Code scan error:", errorMessage);
-                    }
-                ).catch(err => {
-                    console.error("Html5Qrcode.start failed:", err);
-                    alert("Failed to start QR code scanner: " + err.message);
-                });
-
-            } catch (error) {
-                console.error("Camera access or initialization failed:", error);
-                alert("Unable to access the camera or initialization failed. " + error.message);
-            }
-        }
-
-        function printQRCode() {
-            const qrImage = document.querySelector('#qrcode img');
-            if (!qrImage) return;
-
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>QR Code Printout</title>
-                        <style>
-                            body { text-align: center; padding: 40px; font-family: Arial, sans-serif; }
-                            img { margin-top: 20px; display: block; }
-                            .info { margin-top: 10px; font-size: 16px; }
-                        </style>
-                    </head>
-                    <body>
-                        <h2>Generated QR Code</h2>
-                        <img src="${qrImage.src}" width="256" height="256">
-                        <div class="info">Date: ${$('#current_date').text().split(': ')[1]}</div>
-                        <div class="info">Time: ${$('#clock').text().split(': ')[1]}</div>
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-            printWindow.print();
-        }
-
-        $(document).ready(() => {
-            generateQR(); // Initial generation of the QR code
-
-            updateTimer = setInterval(generateQR, 1000);
-
-            $('#qrInput1').on('click', () => startScanner('qrInput1'));
-            $('#qrInput2').on('click', () => startScanner('qrInput2'));
-
-            // Initialize basic camera test
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => document.getElementById('videoTest').srcObject = stream)
-                .catch(err => console.error("Basic camera test failed:", err));
-        });
-
-        window.addEventListener('beforeunload', () => clearInterval(updateTimer));
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
+JavaScript (script.js)
+
+async function startScanner(inputFieldId) {
+    try {
+        // Explicitly request permission first
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        tempStream.getTracks().forEach(track => track.stop()); // Stop immediately after permission granted
+
+        const devices = await Html5Qrcode.getCameras();
+        if (!devices || devices.length === 0) {
+            throw new Error("No camera devices found.");
+        }
+
+        // Prefer rear camera if available
+        let cameraId = devices[0].id; // default to first
+        for (const device of devices) {
+            if (/back|rear|environment/i.test(device.label)) {
+                cameraId = device.id;
+                break;
+            }
+        }
+
+        // Initialize Html5Qrcode
+        const html5QrCode = new Html5Qrcode("reader");
+        $("#reader").show();
+
+        await html5QrCode.start(
+            cameraId,
+            { fps: 10, qrbox: 250 },
+            decodedText => {
+                console.log("Decoded text:", decodedText);
+                $(`#${inputFieldId}`).val(decodedText);
+                generateQR();
+                html5QrCode.stop().then(() => $("#reader").hide());
+            },
+            errorMessage => {
+                console.warn("QR Code scan error:", errorMessage);
+            }
+        );
+    } catch (error) {
+        console.error("Camera access or initialization failed:", error);
+        alert("Unable to access the camera or initialization failed. " + error.message);
+    }
+}
+
+function generateQR() {
+    // Implement your QR code generation logic here
+    console.log("Generating QR code...");
+}

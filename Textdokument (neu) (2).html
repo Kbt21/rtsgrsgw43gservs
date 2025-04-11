@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Scanner and Generator</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            text-align: center;
+        }
+        input {
+            margin: 10px;
+            padding: 8px;
+            width: 300px;
+        }
+        #qrcode {
+            margin: 20px auto;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #reader {
+            width: 300px;
+            margin: auto;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>QR Code Scanner and Generator</h1>
+
+    <!-- Input fields for scanning -->
+    <input id="qrInput1" type="text" placeholder="Click to scan QR Code (Field 1)" readonly>
+    <input id="qrInput2" type="text" placeholder="Click to scan QR Code (Field 2)" readonly>
+
+    <!-- QR Code Display -->
+    <div id="qrcode"></div>
+
+    <!-- Date and Time -->
+    <div id="current_date"></div>
+    <span id="clock"></span>
+
+    <!-- Print Button -->
+    <button onclick="printQRCode()">Print QR Code</button>
+
+    <!-- Camera Scanner -->
+    <div id="reader"></div>
+
+    <script>
+        let qrInstance = null; // Instance of the QR code generator
+        let updateTimer = null; // Timer for dynamic updates
+
+        // Function to generate the QR code
+        function generateQR() {
+            const value1 = $('#qrInput1').val() || '';
+            const value2 = $('#qrInput2').val() || '';
+            const now = new Date();
+
+            // Format date and time
+            const dateStr = now.toLocaleDateString('en-US');
+            const timeStr = now.toLocaleTimeString('en-US');
+            $('#current_date').text(`Date: ${dateStr}`);
+            $('#clock').text(`Time: ${timeStr}`);
+
+            // Combine data for the QR code
+            const qrData = `${value1}|${value2}|${dateStr}|${timeStr}`;
+
+            // Update or create the QR code
+            if (qrInstance) {
+                qrInstance.makeCode(qrData);
+            } else {
+                qrInstance = new QRCode(document.getElementById('qrcode'), {
+                    text: qrData,
+                    width: 256,
+                    height: 256,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            }
+        }
+
+        // Function to start the camera scanner for a specific input field
+        function startScanner(inputFieldId) {
+            const html5QrCode = new Html5Qrcode("reader");
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(() => {
+                    $("#reader").show();
+                    html5QrCode.start(
+                        { facingMode: "environment" }, // Use back camera
+                        { fps: 10, qrbox: 250 },
+                        decodedText => {
+                            $(`#${inputFieldId}`).val(decodedText); // Populate input field with scanned text
+                            generateQR(); // Update the QR code dynamically
+                            html5QrCode.stop().then(() => $("#reader").hide()); // Stop scanner after success
+                        },
+                        errorMessage => {
+                            console.log("QR Code scan error:", errorMessage);
+                        }
+                    ).catch(err => {
+                        console.error("Camera initialization failed:", err);
+                        alert("Unable to access camera. Please check permissions.");
+                        $("#reader").hide();
+                    });
+                })
+                .catch(error => {
+                    console.error("Camera access denied:", error);
+                    alert("Unable to access the camera. Please check permissions.");
+                });
+        }
+
+        // Function to print the generated QR code
+        function printQRCode() {
+            const qrImage = document.querySelector('#qrcode img');
+            if (!qrImage) return;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>QR Code Printout</title>
+                        <style>
+                            body { text-align: center; padding: 40px; font-family: Arial, sans-serif; }
+                            img { margin-top: 20px; display: block; }
+                            .info { margin-top: 10px; font-size: 16px; }
+                        </style>
+                    </head>
+                    <body>
+                        <h2>Generated QR Code</h2>
+                        <img src="${qrImage.src}" width="256" height="256">
+                        <div class="info">Date: ${$('#current_date').text().split(': ')[1]}</div>
+                        <div class="info">Time: ${$('#clock').text().split(': ')[1]}</div>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        $(document).ready(() => {
+            generateQR(); // Initial generation of the QR code
+
+            // Set up automatic updates every second
+            updateTimer = setInterval(generateQR, 1000);
+
+            // Attach click events to input fields for scanning
+            $('#qrInput1').on('click', () => startScanner('qrInput1'));
+            $('#qrInput2').on('click', () => startScanner('qrInput2'));
+        });
+
+        // Cleanup timer when leaving the page
+        window.addEventListener('beforeunload', () => clearInterval(updateTimer));
+    </script>
+</body>
+</html>

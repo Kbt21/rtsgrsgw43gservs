@@ -2,125 +2,94 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Code Scanner and Generator</title>
+    <title>QR Code Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
         #reader {
             width: 300px;
-            margin: 0 auto;
-            display: none;
-        }
-        #qrcode {
             margin: 20px auto;
-            width: 200px;
+            display: none;
+            border: 2px solid #ccc;
+            padding: 10px;
         }
-        .container {
-            text-align: center;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
+        #qrResult {
+            padding: 10px;
+            font-size: 16px;
+            width: 280px;
+            margin-bottom: 10px;
         }
         button {
-            margin: 10px;
-            padding: 8px 16px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        input {
-            margin: 10px 0;
-            padding: 8px;
-            width: 80%;
-            max-width: 300px;
+            padding: 10px 20px;
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>QR Code Scanner & Generator</h1>
-        
-        <div>
-            <input type="text" id="qrInput" placeholder="Enter text for QR code">
-            <button onclick="startScanner('qrInput')">Scan QR Code</button>
-            <button onclick="generateQR()">Generate QR Code</button>
-        </div>
-        
-        <div id="reader"></div>
-        <div id="qrcode"></div>
-    </div>
+
+    <h2>QR Code Scanner</h2>
+    <input type="text" id="qrResult" placeholder="Scanned QR Code" readonly />
+    <br>
+    <button onclick="startScanner('qrResult')">Scan QR Code</button>
+    <div id="reader"></div>
 
     <script>
-        let qrcode = null;
-
         async function startScanner(inputFieldId) {
             try {
-                // First, explicitly request camera permission
+                // 🔓 Explicit permission request
                 const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                tempStream.getTracks().forEach(track => track.stop()); // Stop immediately after permission granted
-                
+                tempStream.getTracks().forEach(track => track.stop());
+
+                // 📸 Get list of available cameras
                 const devices = await Html5Qrcode.getCameras();
                 if (!devices || devices.length === 0) {
                     throw new Error("No camera devices found.");
                 }
-                
-                // Prefer rear camera if available
-                let cameraId = devices[0].id; // default to first
+
+                // 🎯 Try to use rear camera if possible
+                let selectedDeviceId = devices[0].id;
                 for (const device of devices) {
                     if (/back|rear|environment/i.test(device.label)) {
-                        cameraId = device.id;
+                        selectedDeviceId = device.id;
                         break;
                     }
                 }
-                
-                // Initialize Html5Qrcode
+
+                // 🚀 Start the scanner
                 const html5QrCode = new Html5Qrcode("reader");
-                $("#reader").show();
-                
+                document.getElementById("reader").style.display = "block";
+
                 await html5QrCode.start(
-                    { facingMode: "environment" }, // Use rear camera with simple constraint
+                    selectedDeviceId,
                     { fps: 10, qrbox: 250 },
                     decodedText => {
-                        console.log("Decoded text:", decodedText);
-                        $(`#${inputFieldId}`).val(decodedText);
-                        generateQR();
-                        html5QrCode.stop().then(() => $("#reader").hide());
+                        console.log("✅ Decoded:", decodedText);
+                        document.getElementById(inputFieldId).value = decodedText;
+                        generateQR(); // Optional function, stub below
+                        html5QrCode.stop().then(() => {
+                            document.getElementById("reader").style.display = "none";
+                        });
                     },
                     errorMessage => {
-                        console.warn("QR Code scan error:", errorMessage);
+                        console.warn("⚠️ Scan error:", errorMessage);
                     }
                 );
             } catch (error) {
-                console.error("Camera access or initialization failed:", error);
-                alert("Unable to access the camera or initialization failed: " + error.message);
+                console.error("❌ Initialization failed:", error);
+                alert("Camera error: " + error.message);
             }
         }
-        
+
+        // Stub function: Replace or remove as needed
         function generateQR() {
-            const text = $("#qrInput").val();
-            
-            if (!text) {
-                alert("Please enter some text to generate a QR code");
-                return;
-            }
-            
-            // Clear existing QR code if any
-            $("#qrcode").empty();
-            
-            // Generate new QR code
-            qrcode = new QRCode(document.getElementById("qrcode"), {
-                text: text,
-                width: 200,
-                height: 200,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
+            console.log("generateQR() called — replace this with actual logic if needed.");
         }
     </script>
+
 </body>
 </html>

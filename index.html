@@ -64,25 +64,21 @@
     <video id="videoTest" width="300" height="200" autoplay style="border: 1px solid blue;"></video>
 
     <script>
-        let qrInstance = null; // Instance of the QR code generator
-        let updateTimer = null; // Timer for dynamic updates
+        let qrInstance = null;
+        let updateTimer = null;
 
-        // Function to generate the QR code
         function generateQR() {
             const value1 = $('#qrInput1').val() || '';
             const value2 = $('#qrInput2').val() || '';
             const now = new Date();
 
-            // Format date and time
             const dateStr = now.toLocaleDateString('en-US');
             const timeStr = now.toLocaleTimeString('en-US');
             $('#current_date').text(`Date: ${dateStr}`);
             $('#clock').text(`Time: ${timeStr}`);
 
-            // Combine data for the QR code
             const qrData = `${value1}|${value2}|${dateStr}|${timeStr}`;
 
-            // Update or create the QR code
             if (qrInstance) {
                 qrInstance.makeCode(qrData);
             } else {
@@ -99,25 +95,58 @@
 
         async function startScanner(inputFieldId) {
             try {
-                // 1. Define constraints for rear camera
+                let stream = null;
+                let selectedDeviceId = null;
+                let hasRearCamera = false;
+
+                // 1. Get available cameras
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                console.log("Available video devices:", videoDevices);
+
+                // 2. Attempt to find rear camera and default to first camera
+                for (const device of videoDevices) {
+                    if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('rear')) {
+                        selectedDeviceId = device.deviceId;
+                        hasRearCamera = true;
+                        break;
+                    }
+                }
+
+                if (!selectedDeviceId && videoDevices.length > 0) {
+                    selectedDeviceId = videoDevices[0].deviceId;
+                    console.log("Defaulting to first available camera:", videoDevices[0]);
+                }
+
+                if (!selectedDeviceId) {
+                    throw new Error("No camera found.");
+                }
+
+                // 3. Define constraints
                 const constraints = {
-                    video: { facingMode: "environment" }
+                    video: {
+                        deviceId: { exact: selectedDeviceId },
+                        facingMode: hasRearCamera ? "environment" : "user"
+                    }
                 };
 
-                // 2. Request camera access with rear camera
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log("Using constraints:", constraints);
 
-                // 3. Basic Camera Test
+                // 4. Request camera access with constraints
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                // 5. Basic Camera Test
                 document.getElementById('videoTest').srcObject = stream;
 
-                // 4. Ensure #reader is visible and has a size
+                // 6. Ensure #reader is visible and has a size
                 $("#reader").css({ display: "block", width: "300px", height: "200px" });
                 console.log("Reader dimensions:", document.getElementById("reader").getBoundingClientRect());
 
-                // 5. Initialize Html5Qrcode AFTER permission
+                // 7. Initialize Html5Qrcode AFTER permission
                 const html5QrCode = new Html5Qrcode("reader");
 
-                // 6. Start Html5Qrcode with stream constraints
+                // 8. Start Html5Qrcode with constraints
                 html5QrCode.start(
                     constraints,
                     { fps: 10, qrbox: 250 },
@@ -136,39 +165,11 @@
                 });
 
             } catch (error) {
-                console.error("Camera access denied or initialization failed:", error);
-                alert("Unable to access the camera or rear camera not available. Please check permissions. " + error.message);
-                // Fallback to any available camera
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(stream => {
-                        document.getElementById('videoTest').srcObject = stream;
-                        $("#reader").show();
-                        const html5QrCode = new Html5Qrcode("reader");
-                        html5QrCode.start(
-                            { facingMode: "user" },
-                            { fps: 10, qrbox: 250 },
-                            decodedText => {
-                                console.log("Decoded text:", decodedText);
-                                $(`#${inputFieldId}`).val(decodedText);
-                                generateQR();
-                                html5QrCode.stop().then(() => $("#reader").hide());
-                            },
-                            errorMessage => {
-                                console.warn("QR Code scan error:", errorMessage);
-                            }
-                        ).catch(err => {
-                            console.error("Html5Qrcode.start failed (fallback):", err);
-                            alert("Failed to start QR code scanner (fallback): " + err.message);
-                        });
-                    })
-                    .catch(err => {
-                        console.error("Camera access denied (fallback):", err);
-                        alert("Unable to access any camera. Please check permissions. " + err.message);
-                    });
+                console.error("Camera access or initialization failed:", error);
+                alert("Unable to access the camera or initialization failed. " + error.message);
             }
         }
 
-        // Function to print the generated QR code
         function printQRCode() {
             const qrImage = document.querySelector('#qrcode img');
             if (!qrImage) return;
@@ -199,10 +200,8 @@
         $(document).ready(() => {
             generateQR(); // Initial generation of the QR code
 
-            // Set up automatic updates every second
             updateTimer = setInterval(generateQR, 1000);
 
-            // Attach click events to input fields for scanning
             $('#qrInput1').on('click', () => startScanner('qrInput1'));
             $('#qrInput2').on('click', () => startScanner('qrInput2'));
 
@@ -210,10 +209,8 @@
             navigator.mediaDevices.getUserMedia({ video: true })
                 .then(stream => document.getElementById('videoTest').srcObject = stream)
                 .catch(err => console.error("Basic camera test failed:", err));
-
         });
 
-        // Cleanup timer when leaving the page
         window.addEventListener('beforeunload', () => clearInterval(updateTimer));
     </script>
 </body>
